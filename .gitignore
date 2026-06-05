@@ -1,0 +1,11 @@
+# Build artifacts and intermediates
+/dist/
+
+# Per-developer debug keystore for APK signing (regenerated automatically)
+/apk/.debug.keystore
+
+# macOS metadata
+.DS_Store
+
+# Claude Code local session settings
+.claude/
