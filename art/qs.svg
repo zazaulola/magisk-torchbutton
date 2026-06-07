@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="currentColor" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <path id="torch" d="M26,7 v 16 h 4 v 12 l 8,-17 h -4 l 4,-11 z " />
+    <defs>
+        <mask id="gap">
+            <rect x="0" y="0" width="64" height="64" fill="white"/>
+            <use xlink:href="#torch" stroke-width="6" fill="black" stroke="black" />
+        </mask>
+    </defs>
+    <path mask="url(#gap)"
+        d="M38,18 a 20,20 0 1,1 -12,0 v 4 a 16,16 0 1,0 12,0 z"/>
+</svg>
