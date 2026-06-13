@@ -90,10 +90,25 @@ Force one with `TORCHD_BACKEND=apk` in `config.sh`.
 
 - **sysfs**: re-read on every press from the same `brightness` file —
   always up to date.
-- **APK**: kept in memory by the daemon. Caveat: if the flashlight is
-  toggled externally (system QS tile, another app), the daemon's notion
-  of the state drifts until the next long-press — that press performs
-  one "redundant" toggle, after which state is back in sync.
+- **APK**: the helper APK mirrors the *real* LED state into
+  `files/torch_state` and the daemon reads that file (its in-memory
+  `g_torch_state` is only a fallback for when the file doesn't exist yet).
+  The file is kept current by:
+  - `TorchReceiver` writing it right after every `setTorchMode()` we issue;
+  - `TorchWatch`, which registers a `CameraManager.registerTorchCallback()`
+    that fires for *any* torch change — ours, the system flashlight QS tile,
+    other apps — and reports the current state immediately on registration.
+    It's registered while the QS shade is open (`TileService` is listening,
+    and that's exactly where the system flashlight tile is tapped) and while
+    `MainActivity` is in the foreground.
+
+  So a torch lit by the system QS tile is detected and a long-press correctly
+  turns it off. Residual gap: a torch toggled by a *third* app while neither
+  our app nor the QS shade is active isn't seen until our callback next
+  registers (shade/app opened) or we set the torch ourselves — at which point
+  it re-syncs. Closing that gap entirely would need a persistent foreground
+  service (a permanent notification), which isn't worth it for that narrow
+  case.
 
 ## Lock detection
 

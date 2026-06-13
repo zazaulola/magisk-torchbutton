@@ -1,12 +1,14 @@
 # Known limitations
 
-- **APK backend + external torch toggles.** If you flip the flashlight
-  through the system QS tile or another app, the daemon's in-memory state
-  drifts until the next long-press. That press performs one "redundant"
-  toggle and then the state is back in sync. A fix would be to make the
-  helper APK a persistent foreground service that registers a
-  `CameraManager.TorchCallback` and writes state to a file. Not done — not
-  worth the battery for a niche desync.
+- **APK backend + external torch toggles (mostly handled).** The helper APK
+  tracks the real LED state via `CameraManager.registerTorchCallback()` and
+  writes it to `files/torch_state` for the daemon (see
+  [Architecture](Architecture#flashlight-state-tracking)). The system
+  flashlight QS tile and our own changes are covered. Residual gap: if a
+  *third* app toggles the torch while neither our app nor the QS shade is
+  open, the daemon won't notice until our callback next registers or we set
+  the torch ourselves. Fully closing it would need a persistent foreground
+  service (permanent notification) — not worth it for that narrow case.
 
 - **Locked screen ≠ idle device.** If the screen is on but the lockscreen
   is showing, we treat that as "user not actively using the phone" and
