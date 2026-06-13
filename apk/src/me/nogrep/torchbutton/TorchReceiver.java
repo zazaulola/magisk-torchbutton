@@ -45,6 +45,9 @@ public class TorchReceiver extends BroadcastReceiver {
                         .get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 if (Boolean.TRUE.equals(hasFlash)) {
                     cm.setTorchMode(id, enable);
+                    // Mirror immediately so the daemon sees the new state even
+                    // if no torch callback is currently registered.
+                    TorchState.write(context, enable);
                     Log.i(TAG, "torch " + (enable ? "ON" : "OFF") + " on camera " + id);
                     return;
                 }

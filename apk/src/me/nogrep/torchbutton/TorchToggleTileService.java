@@ -16,7 +16,17 @@ public class TorchToggleTileService extends TileService {
     @Override
     public void onStartListening() {
         super.onStartListening();
+        // While the shade is open we watch the real torch state — this is
+        // where the user can tap the system flashlight tile, and we want the
+        // daemon to know about it. Reports current state immediately too.
+        TorchWatch.start(this);
         refreshTile();
+    }
+
+    @Override
+    public void onStopListening() {
+        TorchWatch.stop(this);
+        super.onStopListening();
     }
 
     @Override

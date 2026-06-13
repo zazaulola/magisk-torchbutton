@@ -3,14 +3,14 @@ package me.nogrep.torchbutton;
 import android.app.Activity;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.FileObserver;
 import android.util.TypedValue;
-import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
+
+import java.io.File;
 
 /**
  * Settings-style screen, built programmatically to avoid shipping XML
@@ -18,8 +18,16 @@ import android.widget.TextView;
  * The native daemon polls {@link EnableState#file(android.content.Context)}
  * and either runs its full state machine or operates as a transparent
  * passthrough.
+ *
+ * A FileObserver keeps the Switch live: if the enable flag is flipped from the
+ * Quick Settings tile while this screen is showing (the QS shade sits over the
+ * Activity without pausing it), the Switch updates immediately.
  */
 public class MainActivity extends Activity {
+    private Switch toggle;
+    private FileObserver enableObserver;
+    private boolean suppressListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,13 +56,14 @@ public class MainActivity extends Activity {
         desc.setPadding(0, 0, 0, dp(24));
         root.addView(desc);
 
-        final Switch toggle = new Switch(this);
+        toggle = new Switch(this);
         toggle.setText("Enable long-press torch");
         toggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         toggle.setChecked(EnableState.read(this));
         toggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton v, boolean checked) {
+                if (suppressListener) return;   // programmatic sync, not a user tap
                 EnableState.write(MainActivity.this, checked);
                 // Ask SystemUI to refresh the QS tile state.
                 TorchToggleTileService.requestUpdate(MainActivity.this);
@@ -77,29 +86,57 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        // If the user toggled via the QS tile while this Activity was paused,
-        // re-sync the Switch.
-        View root = findViewById(android.R.id.content);
-        if (root instanceof ViewGroup) {
-            syncSwitchFromState((ViewGroup) root);
-        }
+    protected void onStart() {
+        super.onStart();
+        // Watch the enable flag so a QS-tile toggle reflects here live, even
+        // though the shade overlay doesn't trigger onResume.
+        final File dir = getFilesDir();
+        enableObserver = new FileObserver(dir.getPath(), FileObserver.CLOSE_WRITE) {
+            @Override
+            public void onEvent(int event, String path) {
+                if ("enabled".equals(path)) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { syncSwitch(); }
+                    });
+                }
+            }
+        };
+        enableObserver.startWatching();
+        syncSwitch();
     }
 
-    private void syncSwitchFromState(ViewGroup parent) {
-        for (int i = 0; i < parent.getChildCount(); i++) {
-            View child = parent.getChildAt(i);
-            if (child instanceof Switch) {
-                Switch sw = (Switch) child;
-                boolean current = EnableState.read(this);
-                if (sw.isChecked() != current) {
-                    sw.setChecked(current);
-                }
-                return;
-            } else if (child instanceof ViewGroup) {
-                syncSwitchFromState((ViewGroup) child);
-            }
+    @Override
+    protected void onStop() {
+        if (enableObserver != null) {
+            enableObserver.stopWatching();
+            enableObserver = null;
+        }
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-sync the real torch state into the file while we're foreground.
+        TorchWatch.start(this);
+        syncSwitch();
+    }
+
+    @Override
+    protected void onPause() {
+        TorchWatch.stop(this);
+        super.onPause();
+    }
+
+    /** Set the Switch to match the persisted enable flag, without re-firing
+     *  the listener (which would write the value straight back). */
+    private void syncSwitch() {
+        if (toggle == null) return;
+        boolean current = EnableState.read(this);
+        if (toggle.isChecked() != current) {
+            suppressListener = true;
+            toggle.setChecked(current);
+            suppressListener = false;
         }
     }
 

@@ -71,10 +71,15 @@ static char g_torch_switch_path[256] = "";
 static char g_backlight_path[256]= "";
 
 /* When we can't write to sysfs (e.g. Pixel/Tensor — torch is owned by Camera
-   HAL), we fall back to the companion APK and track torch state in memory. */
-static char g_torch_pkg[128]     = "me.nogrep.torchbutton";
-static int  g_torch_state        = 0;     /* 0 = off, 1 = on; in-memory only */
-static int  g_use_apk_backend    = 0;     /* set when discover_torch finds no sysfs */
+   HAL), we fall back to the companion APK. The APK tracks the *real* torch
+   state via CameraManager.registerTorchCallback() and mirrors it into
+   files/torch_state, so we notice when something else (e.g. the system
+   flashlight QS tile) toggles the LED. We read that file; g_torch_state is
+   only a fallback for when the file doesn't exist yet. */
+static char g_torch_pkg[128]        = "me.nogrep.torchbutton";
+static int  g_torch_state           = 0;  /* in-memory fallback: 0=off 1=on */
+static char g_torch_state_file[256] = "/data/data/me.nogrep.torchbutton/files/torch_state";
+static int  g_use_apk_backend       = 0;  /* set when discover_torch finds no sysfs */
 
 /* Enable / disable: the companion APK writes "0" or "1" into a file that the
    daemon polls. Default-on if the file is missing (fresh install). When
@@ -224,6 +229,19 @@ static int discover_torch(void) {
 
 static int torch_read(void) {
     if (g_use_apk_backend) {
+        /* Source of truth: the file the APK keeps in sync with the real LED
+           state via its torch callback. Fall back to our last-known value if
+           the file isn't there yet (APK not installed / never ran). */
+        FILE *f = fopen(g_torch_state_file, "r");
+        if (f) {
+            int v = 0;
+            int ok = fscanf(f, "%d", &v) == 1;
+            fclose(f);
+            if (ok) {
+                g_torch_state = (v != 0) ? 1 : 0;
+                return g_torch_state;
+            }
+        }
         return g_torch_state;
     }
     if (!g_torch_path[0]) return -1;
@@ -599,6 +617,12 @@ int main(int argc, char **argv) {
         g_enable_file[sizeof(g_enable_file) - 1] = '\0';
     }
 
+    const char *env_tstate = getenv("TORCHD_TORCH_STATE_FILE");
+    if (env_tstate && env_tstate[0]) {
+        strncpy(g_torch_state_file, env_tstate, sizeof(g_torch_state_file) - 1);
+        g_torch_state_file[sizeof(g_torch_state_file) - 1] = '\0';
+    }
+
     signal(SIGINT,  on_signal);
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
@@ -610,7 +634,8 @@ int main(int argc, char **argv) {
            Fall back to broadcasting an intent to the companion APK, which
            uses CameraManager.setTorchMode(). */
         g_use_apk_backend = 1;
-        logmsg("no sysfs torch — using APK backend (pkg=%s)", g_torch_pkg);
+        logmsg("no sysfs torch — using APK backend (pkg=%s, state=%s)",
+               g_torch_pkg, g_torch_state_file);
     } else {
         logmsg("torch brightness=%s  switch=%s",
                g_torch_path, g_torch_switch_path[0] ? g_torch_switch_path : "(none)");
