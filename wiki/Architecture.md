@@ -112,24 +112,58 @@ Force one with `TORCHD_BACKEND=apk` in `config.sh`.
 
 ## Lock detection
 
-`dumpsys window` is invoked once per long-press and scanned for a few
+`timeout 1 dumpsys window` is invoked once per long-press and scanned for a few
 markers — multi-line `KeyguardServiceDelegate:` / `KeyguardController:`
-(Android 13+) and the legacy single-line `mShowingLockscreen=true`.
-Takes 50–200 ms; only triggered on long-press, so short presses are
-unaffected.
+(Android 13+) and the legacy single-line `mShowingLockscreen=true`. The
+`timeout` bound means a wedged WindowManager can never block the input loop
+(it would otherwise leave the Power button dead); on timeout we fail open
+(treat as unlocked → system power dialog). Takes 50–200 ms; only triggered on
+long-press, so short presses are unaffected.
+
+## State storage
+
+The enable flag and mirrored torch state live in the app's **device-encrypted**
+storage (`/data/user_de/0/me.nogrep.torchbutton/files/{enabled,torch_state}`),
+written by the APK via `createDeviceProtectedStorageContext()`, atomically
+(temp + rename), and made world-readable so the root daemon can read them. DE
+(unlike credential-encrypted `/data/data`) is available before the first unlock
+(BFU), and the `magisk` daemon domain can read it — verified on-device — so the
+enable flag and torch state are honored even right after a reboot, before any
+unlock. The `directBootAware` receivers also run in BFU, so the torch toggles
+and seeds its state then too.
+
+## Talking to the APK
+
+The daemon drives the torch with `am broadcast -n me.nogrep.torchbutton/.TorchReceiver`
+— an **explicit component** target. The receiver is `exported="false"`, so no
+other app can reach it; the daemon runs as root, which is allowed to deliver to
+a non-exported component.
+
+## Device loss / recovery
+
+The acquire-and-run logic lives in `run_session()`; `main()` calls it in a
+backoff loop. On a `read`/`poll` error or `POLLERR/POLLHUP` (suspend-resume
+re-enumeration, hotplug) the session returns and `main()` re-acquires the
+device in place, rather than exiting and waiting for the watchdog.
 
 ## SELinux
 
-`post-fs-data.sh` runs `magiskpolicy --live` with grants for the
-`magisk` domain to read/write `sysfs_leds`, `sysfs_camera`, `sysfs_lights`,
-`input_device`, and `uinput_device`. On stock Magisk these usually already
-exist, but tighter OEM policies need the explicit rules — otherwise the
-daemon hits `EACCES` opening the torch sysfs node or `/dev/uinput`.
+Rules ship as a persistent `sepolicy.rule` (applied by Magisk every boot, more
+reliable than runtime `magiskpolicy --live`): write to `sysfs_leds` /
+`sysfs_camera` / `sysfs_lights`, read-only to `sysfs_lcd_backlight` /
+`sysfs_graphics`, and read/write the `input_device` / `uinput_device` char
+devices. Least-privilege — no blanket generic-`sysfs` write. On stock Magisk
+the magisk domain often already has enough; the rules make it robust on
+stricter ROMs, and Magisk silently skips rules for types absent on a device.
 
-## Failure mode
+## Failure mode / disable
 
-- if the daemon crashes, `service.sh` restarts it within 3 seconds — the
-  Power button is "frozen" for at most that long;
+- if the daemon crashes, the `service.sh` watchdog restarts it (3 s, backing
+  off on repeated fast failures) — the Power button is "frozen" for at most
+  that long;
+- when the module is **disabled or removed** in Magisk, the watchdog notices
+  the `disable`/`remove` marker, kills the daemon (releasing the input grab),
+  and stops — no reboot needed to get the Power button back;
 - holding Power 8–10 seconds triggers a **hardware** PMIC reset below the
   kernel — independent of the daemon or Android, always available as an
   emergency exit.

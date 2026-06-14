@@ -12,7 +12,12 @@ torch node, or you want to tune the long-press threshold.
 | `TORCHD_THRESHOLD_MS` | `400` | long-press threshold in ms |
 | `TORCHD_BRIGHTNESS` | `255` | value written to sysfs `brightness` (sysfs backend only) |
 | `TORCHD_VERBOSE` | (off) | `1` to log every press/release event |
-| `TORCHD_ENABLE_FILE` | `/data/data/me.nogrep.torchbutton/files/enabled` | path to the on/off flag (see [Enabling and disabling](Enabling-and-disabling)) |
+| `TORCHD_LOG` | `/data/adb/torchbutton.log` | daemon log path (truncated each boot) |
+| `TORCHD_ENABLE_FILE` | `/data/user_de/0/me.nogrep.torchbutton/files/enabled` | path to the on/off flag (see [Enabling and disabling](Enabling-and-disabling)) |
+| `TORCHD_TORCH_STATE_FILE` | `/data/user_de/0/me.nogrep.torchbutton/files/torch_state` | path to the mirrored real torch state |
+
+All of these are exported to the daemon by `service.sh`, so setting them in
+`config.sh` takes effect (after a reboot — see the caveat below).
 
 After editing, restart the daemon: `adb shell su -c 'pkill -x torchd'`
 (the watchdog inside `service.sh` will relaunch). Beware: the watchdog process

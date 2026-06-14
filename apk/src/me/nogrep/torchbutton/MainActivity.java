@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
 
         toggle = new Switch(this);
         toggle.setText("Enable long-press torch");
+        toggle.setContentDescription("Enable long-press torch");
         toggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         toggle.setChecked(EnableState.read(this));
         toggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -79,7 +80,7 @@ public class MainActivity extends Activity {
         );
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         hint.setPadding(0, dp(24), 0, 0);
-        hint.setTextColor(Color.GRAY);
+        hint.setTextColor(secondaryTextColor());
         root.addView(hint);
 
         setContentView(root);
@@ -138,6 +139,16 @@ public class MainActivity extends Activity {
             toggle.setChecked(current);
             suppressListener = false;
         }
+    }
+
+    /** Theme's secondary text color, so the hint reads in both light and dark. */
+    private int secondaryTextColor() {
+        TypedValue tv = new TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.textColorSecondary, tv, true)) {
+            if (tv.resourceId != 0) return getColor(tv.resourceId);
+            return tv.data;
+        }
+        return Color.GRAY;
     }
 
     private int dp(int v) {

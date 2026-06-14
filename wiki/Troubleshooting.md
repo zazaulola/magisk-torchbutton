@@ -8,7 +8,7 @@ adb shell 'su -c "echo TORCHD_VERBOSE=1 >> /data/adb/modules/torchbutton/config.
 # was launched at boot, so editing config.sh after boot has no effect on the
 # already-running watchdog.
 adb reboot
-adb shell 'su -c "tail -F /data/local/tmp/torchd.log"'
+adb shell 'su -c "tail -F /data/adb/torchbutton.log"'
 ```
 
 Expected lines:
@@ -30,27 +30,29 @@ Expected lines:
 ## Daemon doesn't start
 
 ```sh
-adb shell 'su -c "cat /data/local/tmp/torchd.log; echo ---; ls -la /data/adb/modules/torchbutton/bin/$(getprop ro.product.cpu.abi)/torchd"'
+adb shell 'su -c "cat /data/adb/torchbutton.log; echo ---; ls -la /data/adb/modules/torchbutton/bin/$(getprop ro.product.cpu.abi)/torchd"'
 ```
 
 Common causes: no binary for this ABI (rebuild with the matching `ndk-build`),
-no SELinux access to `/dev/uinput` (the `magiskpolicy --live` in
-`post-fs-data.sh` should fix this; verify with `dmesg | grep avc`), or
-something else has the input device grabbed (check `lsof /dev/input/event0`).
+no SELinux access to `/dev/uinput` (the bundled `sepolicy.rule` should grant
+it; verify with `dmesg | grep avc`), or something else has the input device
+grabbed (check `lsof /dev/input/event0`).
 
 ## Flashlight doesn't turn on at long-press
 
 ```sh
 adb shell 'logcat -d -s TorchReceiver:*'
 # APK backend: expect "torch ON on camera 0"
-adb shell 'su -c "grep long-press /data/local/tmp/torchd.log | tail -5"'
+adb shell 'su -c "grep long-press /data/adb/torchbutton.log | tail -5"'
 # check which backend is in use and the recorded torch state
 ```
 
-For the sysfs backend, check the configured path:
+For the sysfs backend, find and test the node directly (don't rely on
+`$TORCHD_TORCH_PATH` — it's unset unless you set it in `config.sh`):
 
 ```sh
-adb shell 'su -c "cat /data/adb/modules/torchbutton/config.sh; echo 255 > $TORCHD_TORCH_PATH"'
+adb shell 'su -c "ls /sys/class/leds | grep -iE \"torch|flash|spot\""'
+adb shell 'su -c "echo 255 > /sys/class/leds/<name>/brightness"'   # paste the real node
 ```
 
 ## Power dialog flashes briefly while the flashlight turns off
@@ -63,7 +65,7 @@ The system long-press timer fired before our threshold did. Drop
 That used to be broken; it should work now. If it doesn't:
 
 ```sh
-adb shell 'su -c "tail -F /data/local/tmp/torchd.log"' | grep POWER
+adb shell 'su -c "tail -F /data/adb/torchbutton.log"' | grep POWER
 ```
 
 When you press Volume first, then Power, the line should look like

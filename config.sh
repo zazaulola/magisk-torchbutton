@@ -16,3 +16,10 @@
 # TORCHD_THRESHOLD_MS=400
 # TORCHD_BRIGHTNESS=255
 # TORCHD_VERBOSE=1     # log every press/release event
+#
+# Log file (default /data/adb/torchbutton.log, truncated each boot):
+# TORCHD_LOG=/data/local/tmp/torchd.log
+#
+# Override the daemon-visible state files. Usually leave these alone:
+# TORCHD_ENABLE_FILE=/data/user_de/0/me.nogrep.torchbutton/files/enabled
+# TORCHD_TORCH_STATE_FILE=/data/user_de/0/me.nogrep.torchbutton/files/torch_state

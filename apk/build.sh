@@ -73,12 +73,22 @@ if [[ -d "$WORK/compiled-res" ]]; then
         RES_FLATS+=("$f")
     done < <(find "$WORK/compiled-res" -type f -name '*.flat')
 fi
+# Single source of truth for the version: derive from module.prop so the APK
+# and the Magisk module never drift. (versionName = module 'version' minus 'v'.)
+MODULE_PROP="$(cd "$HERE/.." && pwd)/module.prop"
+VCODE=$(awk -F= '$1=="versionCode"{print $2}' "$MODULE_PROP")
+VNAME=$(awk -F= '$1=="version"{print $2}' "$MODULE_PROP" | sed 's/^v//')
+: "${VCODE:=1}"; : "${VNAME:=1.0}"
+echo "version     : $VNAME (code $VCODE) from module.prop"
+
 "$AAPT2" link \
     -o "$UNSIGNED" \
     --manifest "$HERE/AndroidManifest.xml" \
     -I "$ANDROID_JAR" \
     --min-sdk-version 24 \
     --target-sdk-version 34 \
+    --version-code "$VCODE" \
+    --version-name "$VNAME" \
     --java "$WORK/gen" \
     "${RES_FLATS[@]}"
 

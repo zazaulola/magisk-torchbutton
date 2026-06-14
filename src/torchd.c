@@ -38,7 +38,7 @@ static FILE *g_log = NULL;
 
 static void log_init(const char *path) {
     if (path && *path) {
-        g_log = fopen(path, "a");
+        g_log = fopen(path, "ae");   /* 'e' = O_CLOEXEC: don't leak into am child */
         if (g_log) setvbuf(g_log, NULL, _IOLBF, 0);
     }
     if (!g_log) g_log = stderr;
@@ -78,14 +78,18 @@ static char g_backlight_path[256]= "";
    only a fallback for when the file doesn't exist yet. */
 static char g_torch_pkg[128]        = "me.nogrep.torchbutton";
 static int  g_torch_state           = 0;  /* in-memory fallback: 0=off 1=on */
-static char g_torch_state_file[256] = "/data/data/me.nogrep.torchbutton/files/torch_state";
+/* Device-encrypted storage (/data/user_de/0/...): readable by the magisk daemon
+   both normally and before the first unlock (BFU), which credential-encrypted
+   /data/data is not. The APK writes the same path via
+   createDeviceProtectedStorageContext(). */
+static char g_torch_state_file[256] = "/data/user_de/0/me.nogrep.torchbutton/files/torch_state";
 static int  g_use_apk_backend       = 0;  /* set when discover_torch finds no sysfs */
 
 /* Enable / disable: the companion APK writes "0" or "1" into a file that the
    daemon polls. Default-on if the file is missing (fresh install). When
    disabled, the daemon goes into transparent-passthrough mode — all events
    are forwarded immediately, identical to having no daemon at all. */
-static char g_enable_file[256]   = "/data/data/me.nogrep.torchbutton/files/enabled";
+static char g_enable_file[256]   = "/data/user_de/0/me.nogrep.torchbutton/files/enabled";
 static int  g_enabled            = 1;
 static long long g_enabled_checked_ms = 0;
 #define ENABLED_POLL_MS 500
@@ -203,20 +207,28 @@ static int discover_torch(void) {
         if (try_torch_candidate(known[i])) return 0;
     }
 
-    /* Scan /sys/class/leds for any directory whose name looks like a torch. */
-    DIR *d = opendir("/sys/class/leds");
-    if (d) {
+    /* Scan /sys/class/leds for any directory whose name looks like a torch.
+       Two passes so a real "torch" node always wins over a "flash"/"spot" one,
+       and skip names that merely contain those substrings but aren't the torch
+       (e.g. button-backlight, charging LED, keyboard/indicator LEDs). */
+    static const char *deny[] = {
+        "backlight", "button", "keyboard", "kbd", "indicator",
+        "charg", "battery", "notification", "lcd", "wled", NULL
+    };
+    for (int pass = 0; pass < 2; pass++) {
+        DIR *d = opendir("/sys/class/leds");
+        if (!d) break;
         struct dirent *e;
         while ((e = readdir(d))) {
             if (e->d_name[0] == '.') continue;
             const char *n = e->d_name;
-            int looks_like_torch =
-                strstr(n, "torch")  != NULL ||
-                strstr(n, "flash")  != NULL ||
-                strstr(n, "Torch")  != NULL ||
-                strstr(n, "Flash")  != NULL ||
-                strstr(n, "spot")   != NULL;
-            if (!looks_like_torch) continue;
+            int denied = 0;
+            for (int i = 0; deny[i]; i++) if (strcasestr(n, deny[i])) { denied = 1; break; }
+            if (denied) continue;
+            int is_torch = strcasestr(n, "torch") != NULL;
+            int is_flashlike = strcasestr(n, "flash") != NULL || strcasestr(n, "spot") != NULL;
+            /* pass 0: only real torch nodes; pass 1: flash/spot fallbacks. */
+            if (pass == 0 ? !is_torch : !(is_flashlike && !is_torch)) continue;
             char p[256];
             snprintf(p, sizeof(p), "/sys/class/leds/%s/brightness", n);
             if (try_torch_candidate(p)) { closedir(d); return 0; }
@@ -254,6 +266,12 @@ static int torch_read(void) {
 }
 
 static void torch_write_apk(int on) {
+    /* Target the receiver by explicit component so it can stay exported=false
+       (no other app can reach it). We run as root, so `am` is allowed to
+       deliver to a non-exported component. */
+    char component[160];
+    snprintf(component, sizeof(component), "%s/.TorchReceiver", g_torch_pkg);
+
     /* fork+exec `am broadcast` so we don't block the main loop waiting for
        the child. The user is still holding the button anyway, but we want to
        keep reading input events (release detection) without latency. */
@@ -264,7 +282,7 @@ static void torch_write_apk(int on) {
     }
     if (pid == 0) {
         /* Child: redirect stdio away from the daemon log and exec am. */
-        int devnull = open("/dev/null", O_RDWR);
+        int devnull = open("/dev/null", O_RDWR | O_CLOEXEC);
         if (devnull >= 0) {
             dup2(devnull, 0); dup2(devnull, 1); dup2(devnull, 2);
             if (devnull > 2) close(devnull);
@@ -273,7 +291,7 @@ static void torch_write_apk(int on) {
         execlp("am", "am", "broadcast",
                "-a", "me.nogrep.torchbutton.SET",
                "--es", "state", state,
-               "-p", g_torch_pkg,
+               "-n", component,
                "--include-stopped-packages",
                (char *)NULL);
         _exit(127);
@@ -289,11 +307,11 @@ static void torch_write(int on) {
     }
     if (!g_torch_path[0]) return;
     int val = on ? g_torch_brightness : 0;
-    int fd = open(g_torch_path, O_WRONLY);
+    int fd = open(g_torch_path, O_WRONLY | O_CLOEXEC);
     if (fd >= 0) {
         char buf[16];
         int n = snprintf(buf, sizeof(buf), "%d", val);
-        if (write(fd, buf, n) < 0) {
+        if (n > 0 && n < (int)sizeof(buf) && write(fd, buf, n) < 0) {
             logmsg("torch write failed: %s", strerror(errno));
         }
         close(fd);
@@ -383,7 +401,12 @@ static int is_screen_on(void) {
  * only there. This matches what Android 14/15/16 emit.
  */
 static int is_keyguard_locked(void) {
-    FILE *p = popen("dumpsys window 2>/dev/null", "r");
+    /* Bounded with `timeout` (toybox) so a wedged WindowManager can never block
+       the input loop — a hung dumpsys would otherwise leave the Power button
+       dead. On timeout/failure we fail open (return 0 = not locked), which
+       routes a screen-on long-press to the system power dialog rather than
+       silently turning the torch on. */
+    FILE *p = popen("timeout 1 dumpsys window 2>/dev/null", "r");
     if (!p) return 0;
     char line[1024];
     int locked = 0;
@@ -434,37 +457,43 @@ static int is_keyguard_locked(void) {
 static int find_power_device(char *out, size_t out_size) {
     DIR *d = opendir("/dev/input");
     if (!d) return -1;
-    int best_fd = -1;
     char best_path[256] = "";
-    int best_keycount = 0; /* prefer a device that ONLY has KEY_POWER */
+    int best_keycount = 0; /* prefer a device that has the FEWEST keys (likely the
+                              dedicated gpio-keys/power node, not a full keyboard) */
+    int best_eventnum = -1;
     struct dirent *e;
     while ((e = readdir(d))) {
         if (strncmp(e->d_name, "event", 5) != 0) continue;
+        int evn = atoi(e->d_name + 5);
         char path[300];
         snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
-        int fd = open(path, O_RDONLY);
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd < 0) continue;
         unsigned long key_bits[NBITS(KEY_MAX)];
         memset(key_bits, 0, sizeof(key_bits));
-        if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) >= 0 &&
-            TEST_BIT(key_bits, KEY_POWER))
-        {
-            int count = 0;
-            for (int i = 0; i < KEY_MAX; i++) if (TEST_BIT(key_bits, i)) count++;
-            if (best_fd < 0 || count < best_keycount) {
-                if (best_fd >= 0) close(best_fd);
-                best_fd = fd;
-                best_keycount = count;
-                strncpy(best_path, path, sizeof(best_path) - 1);
-                best_path[sizeof(best_path) - 1] = '\0';
-                continue;
-            }
-        }
+        int has_power = ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) >= 0 &&
+                        TEST_BIT(key_bits, KEY_POWER);
         close(fd);
+        if (!has_power) continue;
+
+        int count = 0;
+        for (int i = 0; i < KEY_MAX; i++) if (TEST_BIT(key_bits, i)) count++;
+        if (g_verbose) logmsg("candidate %s: KEY_POWER, %d keys", path, count);
+
+        /* Deterministic pick: fewest keys, ties broken by lowest eventN so the
+           choice doesn't depend on readdir() order. */
+        int better = best_path[0] == '\0' ||
+                     count < best_keycount ||
+                     (count == best_keycount && evn < best_eventnum);
+        if (better) {
+            best_keycount = count;
+            best_eventnum = evn;
+            strncpy(best_path, path, sizeof(best_path) - 1);
+            best_path[sizeof(best_path) - 1] = '\0';
+        }
     }
     closedir(d);
-    if (best_fd < 0) return -1;
-    close(best_fd);
+    if (best_path[0] == '\0') return -1;
     strncpy(out, best_path, out_size - 1);
     out[out_size - 1] = '\0';
     return 0;
@@ -475,7 +504,7 @@ static int find_power_device(char *out, size_t out_size) {
 /* ---------------------------------------------------------------------- */
 
 static int create_uinput_mirror(int src_fd) {
-    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) {
         logmsg("open /dev/uinput failed: %s", strerror(errno));
         return -1;
@@ -574,6 +603,8 @@ static const char *state_name(enum power_state s) {
     return "?";
 }
 
+static int run_session(void);
+
 int main(int argc, char **argv) {
     /* CLI / env config */
     const char *log_path = getenv("TORCHD_LOG");
@@ -650,14 +681,34 @@ int main(int argc, char **argv) {
         logmsg("backlight=%s", g_backlight_path);
     }
 
+    /* Acquire the input device and run the event loop. On a device error
+       (hotplug / suspend-resume re-enumeration / read error) re-acquire in
+       place instead of exiting, so the gesture survives without waiting for
+       the watchdog's restart delay. Backs off, capped at 2s. */
+    int retry_ms = 200;
+    while (g_running) {
+        int rc = run_session();
+        if (rc == 0 || !g_running) break;   /* clean shutdown via signal */
+        logmsg("session ended (rc=%d) — re-acquiring in %dms", rc, retry_ms);
+        usleep(retry_ms * 1000);
+        if (retry_ms < 2000) retry_ms *= 2;
+    }
+    logmsg("shutting down");
+    return 0;
+}
+
+/* One acquire-and-run session. Grabs the Power device, mirrors it via uinput,
+   and runs the event loop until either a clean shutdown (signal) -> returns 0,
+   or a device/setup error -> returns >0 so main() can re-acquire. */
+static int run_session(void) {
     char powerdev[256];
     if (find_power_device(powerdev, sizeof(powerdev)) != 0) {
-        logmsg("ERROR: could not find input device with KEY_POWER");
+        logmsg("could not find input device with KEY_POWER");
         return 3;
     }
     logmsg("power device=%s", powerdev);
 
-    int src_fd = open(powerdev, O_RDONLY);
+    int src_fd = open(powerdev, O_RDONLY | O_CLOEXEC);
     if (src_fd < 0) {
         logmsg("open %s failed: %s", powerdev, strerror(errno));
         return 4;
@@ -678,6 +729,7 @@ int main(int argc, char **argv) {
     logmsg("torchd ready (long_press_ms=%d, brightness=%d, enable_file=%s)",
            g_long_press_ms, g_torch_brightness, g_enable_file);
 
+    int rc = 0;
     /*
      * State machine — always-buffer with chord exception:
      *
@@ -726,15 +778,30 @@ int main(int argc, char **argv) {
         if (pr < 0) {
             if (errno == EINTR) continue;
             logmsg("poll error: %s", strerror(errno));
+            rc = 1;
+            break;
+        }
+        if (pr > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+            /* Device went away (suspend/resume re-enumeration, unplug). Bail so
+               we re-acquire — without this, poll() would spin returning the
+               error flag forever and peg a core. */
+            logmsg("power device error: revents=0x%x — re-acquiring", pfd.revents);
+            rc = 1;
             break;
         }
 
         /* Long-press fired with no release yet? */
         if (state == PS_LIVE && now_ms() - press_started_ms >= g_long_press_ms) {
             if (!check_enabled()) {
-                /* Disabled — we already forwarded the press at t=0, so the
-                   system has been handling the long-press itself. Just stop
-                   the timer and wait for release. */
+                /* Disabled. Normally the press was already forwarded at t=0,
+                   but if it was buffered (enable flag flipped off between this
+                   press and the threshold), forward it now so we don't leave an
+                   orphan release with no matching press. */
+                if (!press_forwarded) {
+                    emit(ufd, EV_KEY, KEY_POWER, 1);
+                    emit_syn(ufd);
+                    press_forwarded = 1;
+                }
                 state = PS_FORWARDED;
                 continue;
             }
@@ -779,7 +846,8 @@ int main(int argc, char **argv) {
             ssize_t n = read(src_fd, &ev, sizeof(ev));
             if (n < (ssize_t)sizeof(ev)) {
                 if (n < 0 && errno != EAGAIN && errno != EINTR) {
-                    logmsg("read failed: %s", strerror(errno));
+                    logmsg("read failed: %s — re-acquiring", strerror(errno));
+                    rc = 1;
                     break;
                 }
                 continue;
@@ -865,7 +933,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    logmsg("shutting down, state=%s", state_name(state));
+    logmsg("session ending (rc=%d, state=%s)", rc, state_name(state));
     /* Best-effort: make sure we leave the system without a stuck press. */
     if (press_forwarded && (state == PS_LIVE || state == PS_FORWARDED)) {
         emit(ufd, EV_KEY, KEY_POWER, 0);
@@ -875,5 +943,5 @@ int main(int argc, char **argv) {
     close(ufd);
     ioctl(src_fd, EVIOCGRAB, 0);
     close(src_fd);
-    return 0;
+    return rc;
 }

@@ -4,25 +4,28 @@ This behaviour isn't for everyone, so there's a one-tap toggle in two places.
 
 ## Launcher app
 
-The bundled APK installs as **Torch Button** (amber square with a white
-flashlight) in the app drawer. Tapping it opens a single-screen Settings UI:
+The bundled APK installs as **Torch Button** (a power symbol with a lightning
+bolt in the gap, on a red circle) in the app drawer. Tapping it opens a
+single-screen Settings UI:
 
 - a Switch labeled "Enable long-press torch"
 - a paragraph describing what the module does
 
 ## Quick Settings tile
 
-There's also a QS tile labeled **Torch Button** with the same flashlight glyph.
+There's also a QS tile labeled **Torch Button** with the same power/bolt glyph.
 Add it once via the QS shade → **Edit tiles** → drag the tile into the active
 area. After that one tap toggles the module on and off without leaving whatever
 you were doing.
 
 ## How it works under the hood
 
-Both UIs flip the same one-byte file:
-`/data/data/me.nogrep.torchbutton/files/enabled` — `1` for enabled, `0` for
-disabled. The native daemon polls this file on every Power press (cached for
-500 ms so it doesn't hammer the filesystem).
+Both UIs flip the same one-byte file in device-encrypted storage (so the daemon
+can read it even before the first unlock):
+`/data/user_de/0/me.nogrep.torchbutton/files/enabled` — `1` for enabled, `0`
+for disabled. The native daemon polls this file on every Power press (cached for
+500 ms so it doesn't hammer the filesystem). A missing file defaults to enabled
+(fail-safe).
 
 When disabled, the daemon stays running and still holds the input-device grab,
 but every Power event is forwarded immediately and untouched. Externally it's

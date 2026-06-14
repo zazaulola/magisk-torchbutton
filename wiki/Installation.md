@@ -19,7 +19,7 @@ adb reboot
 ```sh
 adb shell 'su -c "ps -ef | grep torchd | grep -v grep"'
 # should show a torchd process
-adb shell 'su -c "tail -10 /data/local/tmp/torchd.log"'
+adb shell 'su -c "tail -10 /data/adb/torchbutton.log"'
 # should end with "torchd ready"
 ```
 

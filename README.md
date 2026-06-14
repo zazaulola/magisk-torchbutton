@@ -31,10 +31,12 @@ Or via the Magisk app → *Modules* → *Install from storage*.
 
 ## Toggle
 
-The module ships with a launcher app **Torch Button** (amber square + white
-flashlight) and a Quick Settings tile. Both flip a single on/off flag the
+The module ships with a launcher app **Torch Button** (power symbol with a
+lightning bolt) and a Quick Settings tile. Both flip a single on/off flag the
 daemon reads. When disabled, the daemon stays loaded but forwards every
 Power event transparently — indistinguishable from not having the module.
+Disabling or removing the module in Magisk releases the Power button without a
+reboot.
 
 Default is **on**.
 

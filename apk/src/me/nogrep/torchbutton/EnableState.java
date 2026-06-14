@@ -3,26 +3,34 @@ package me.nogrep.torchbutton;
 import android.content.Context;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 
 /**
- * The on/off flag lives at getFilesDir()/enabled and is shared between the
- * UI (MainActivity, TorchToggleTileService) and the native torchd daemon
- * (which polls the file from /data/data/me.nogrep.torchbutton/files/enabled).
+ * The on/off flag, shared between the UI (MainActivity, TorchToggleTileService)
+ * and the native torchd daemon.
  *
- * The file contains a single character: '1' for enabled, '0' for disabled.
- * If the file is missing, both the daemon and this code default to enabled
- * — which means a fresh install behaves the way the user expected.
+ * Stored in DEVICE-ENCRYPTED storage (/data/user_de/0/<pkg>/files/enabled) so
+ * the root daemon can read it even before the first unlock (BFU) — credential-
+ * encrypted /data/data isn't available then. One character: '1' enabled, '0'
+ * disabled. Missing file => enabled (a fresh install works without opening the
+ * app). World-readable (0644) so the root daemon can read it. Writes are atomic
+ * (temp + rename) so the daemon never sees a half-written / zero-length file.
  */
 public final class EnableState {
     private static final String FILE_NAME = "enabled";
 
     private EnableState() {}
 
+    static File dir(Context ctx) {
+        Context de = ctx.isDeviceProtectedStorage()
+                ? ctx : ctx.createDeviceProtectedStorageContext();
+        return de.getFilesDir();
+    }
+
     public static File file(Context ctx) {
-        return new File(ctx.getFilesDir(), FILE_NAME);
+        return new File(dir(ctx), FILE_NAME);
     }
 
     public static boolean read(Context ctx) {
@@ -37,16 +45,6 @@ public final class EnableState {
     }
 
     public static void write(Context ctx, boolean enabled) {
-        File f = file(ctx);
-        try (FileOutputStream out = new FileOutputStream(f)) {
-            out.write(enabled ? '1' : '0');
-        } catch (IOException e) {
-            /* nothing we can do; daemon defaults to enabled */
-        }
-        // File must be world-readable so torchd (root, magisk SELinux domain)
-        // can read it without us having to relax SELinux further. On Android
-        // the default mode of newly-created app files is 0600 — we need 0644.
-        //noinspection ResultOfMethodCallIgnored
-        f.setReadable(true, /* ownerOnly */ false);
+        FileIO.writeByteAtomically(dir(ctx), FILE_NAME, enabled ? '1' : '0');
     }
 }

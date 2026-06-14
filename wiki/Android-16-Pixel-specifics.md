@@ -26,20 +26,23 @@ still works for older Android.
 
 The `magisk` SELinux domain already has very broad access on stock Magisk,
 but on tighter Pixel policies a write to `/sys/.../brightness` or an open
-of `/dev/uinput` can hit `EACCES`. `post-fs-data.sh` patches the live
-policy with `magiskpolicy --live`:
+of `/dev/uinput` can hit `EACCES`. Rules ship as a persistent `sepolicy.rule`
+(applied by Magisk every boot):
 
-```sh
-allow magisk sysfs_leds       file { read write open getattr ioctl }
-allow magisk sysfs_camera     file { read write open getattr ioctl }
-allow magisk sysfs_lights     file { read write open getattr ioctl }
-allow magisk uinput_device    chr_file { read write open getattr ioctl }
-allow magisk input_device     chr_file { read write open getattr ioctl }
+```
+allow magisk sysfs_leds file { read write open getattr ioctl }
+allow magisk sysfs_camera file { read write open getattr ioctl }
+allow magisk sysfs_lights file { read write open getattr ioctl }
+allow magisk sysfs_lcd_backlight file { read open getattr }
+allow magisk sysfs_graphics file { read open getattr }
+allow magisk input_device chr_file { read write open getattr ioctl }
+allow magisk uinput_device chr_file { read write open getattr ioctl }
 ```
 
 On Pixel 8 Pro under Magisk 30.7 the rules turned out to be unnecessary
 in practice — Magisk's default policy already grants enough — but they're
-harmless and make the module robust on stricter ROMs.
+least-privilege (no blanket `sysfs` write) and make the module robust on
+stricter ROMs. Magisk skips rules for types that don't exist on a device.
 
 ## Tensor flash unit
 

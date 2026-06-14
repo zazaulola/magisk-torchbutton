@@ -1,0 +1,16 @@
+# SELinux rules applied persistently by Magisk every boot (more reliable than
+# `magiskpolicy --live` from post-fs-data, and rules for types absent on a given
+# device are skipped automatically).
+#
+# Least privilege: write access only to the LED/flash node types the daemon
+# actually drives, read-only to the screen-state nodes, and the input/uinput
+# char devices for EVIOCGRAB + event injection. (The state files in
+# /data/user_de/<pkg>/files are app_data_file, which the magisk domain may
+# already read — no rule needed.)
+allow magisk sysfs_leds file { read write open getattr ioctl }
+allow magisk sysfs_camera file { read write open getattr ioctl }
+allow magisk sysfs_lights file { read write open getattr ioctl }
+allow magisk sysfs_lcd_backlight file { read open getattr }
+allow magisk sysfs_graphics file { read open getattr }
+allow magisk input_device chr_file { read write open getattr ioctl }
+allow magisk uinput_device chr_file { read write open getattr ioctl }

@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="me.nogrep.torchbutton"
-    android:versionCode="6"
-    android:versionName="1.5">
+    package="me.nogrep.torchbutton">
+    <!-- versionCode / versionName are injected at build time from module.prop
+         (see apk/build.sh) so the APK and the Magisk module never drift. -->
 
     <uses-sdk
         android:minSdkVersion="24"
         android:targetSdkVersion="34" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:label="Torch Button"
@@ -37,13 +39,22 @@
             </intent-filter>
         </service>
 
-        <!-- Receiver the native daemon broadcasts to in order to drive the torch. -->
+        <!-- Receiver the native daemon broadcasts to (by explicit component, as
+             root) to drive the torch. exported=false: no other app can reach it. -->
         <receiver
             android:name=".TorchReceiver"
+            android:exported="false"
+            android:directBootAware="true" />
+
+        <!-- Seeds the real torch state into files/torch_state at boot, including
+             before first unlock (DE storage). -->
+        <receiver
+            android:name=".BootReceiver"
             android:exported="true"
             android:directBootAware="true">
             <intent-filter>
-                <action android:name="me.nogrep.torchbutton.SET" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>

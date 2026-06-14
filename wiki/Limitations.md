@@ -1,14 +1,17 @@
 # Known limitations
 
-- **APK backend + external torch toggles (mostly handled).** The helper APK
-  tracks the real LED state via `CameraManager.registerTorchCallback()` and
-  writes it to `files/torch_state` for the daemon (see
-  [Architecture](Architecture#flashlight-state-tracking)). The system
-  flashlight QS tile and our own changes are covered. Residual gap: if a
-  *third* app toggles the torch while neither our app nor the QS shade is
-  open, the daemon won't notice until our callback next registers or we set
-  the torch ourselves. Fully closing it would need a persistent foreground
-  service (permanent notification) — not worth it for that narrow case.
+- **APK backend + external torch toggles — needs the QS tile added.** The
+  helper APK tracks the real LED state via `CameraManager.registerTorchCallback()`
+  and writes it to `files/torch_state` for the daemon (see
+  [Architecture](Architecture#state-storage)). The callback is live while our
+  **Torch Button Quick Settings tile is in the shade** (the tile must be added
+  to your active QS), or while the app is in the foreground, plus a boot seed
+  (`BootReceiver`) and `onTorchModeUnavailable` → off. So catching a torch lit
+  by the *system* flashlight tile requires our tile to also be in that shade —
+  **add the Torch Button tile** for this to work. Without it (or the app open),
+  an external toggle isn't noticed until our callback next registers. Closing
+  the gap entirely would need a persistent foreground service (permanent
+  notification) — deliberately not done.
 
 - **Locked screen ≠ idle device.** If the screen is on but the lockscreen
   is showing, we treat that as "user not actively using the phone" and

@@ -44,6 +44,15 @@ public final class TorchWatch {
                         TorchState.write(app, enabled);
                     }
                 }
+                @Override
+                public void onTorchModeUnavailable(String cameraId) {
+                    // Another app opened the camera -> the torch is forced off
+                    // and we can't drive it. Record off so a long-press doesn't
+                    // try to "turn off" a torch that's already gone.
+                    if (sFlashId == null || sFlashId.equals(cameraId)) {
+                        TorchState.write(app, false);
+                    }
+                }
             };
         }
         if (sRefs++ == 0) {

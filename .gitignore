@@ -12,3 +12,6 @@
 
 # Editor settings
 .vscode/
+
+# Audit report (point-in-time, not source)
+/AUDIT.md
