@@ -5,9 +5,9 @@
     <defs>
         <mask id="gap">
             <rect x="0" y="0" width="64" height="64"/>
-            <use xlink:href="#torch" stroke-width="6" fill="black" stroke="black" />
+            <use xlink:href="#torch" stroke-width="12" fill="black" stroke="black" />
         </mask>
     </defs>
     <path mask="url(#gap)"
-        d="M38,15 a 20,20 0 1,1 -12,0 v 4 a 16,16 0 1,0 12,0 z"/>
+        d="M39,10 a 24,24 0 1,1 -14,0 v 8 a 16,16 0 1,0 12,0 z"/>
 </svg>

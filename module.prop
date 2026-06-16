@@ -1,7 +1,7 @@
 id=torchbutton
 name=Torch Button
-version=v1.1.3
-versionCode=7
+version=v1.1.4
+versionCode=8
 author=nogrep
 description=Long-press Power toggles the flashlight when the screen is off or locked. Long-press shows the system power dialog when the screen is on and unlocked. Long-press always turns the flashlight off if it is on. Power+Vol chords (screenshot, assistant) keep working. Enable/disable from the bundled app or a Quick Settings tile.
 updateJson=https://raw.githubusercontent.com/zazaulola/magisk-torchbutton/main/update.json

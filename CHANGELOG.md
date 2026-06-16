@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.4
+
+- Icon refresh: thicker ring on the power+bolt glyph (launcher icon and QS
+  tile) — reads more clearly, especially at small Quick-Settings size. No
+  functional changes.
+
 ## v1.1.3
 
 Hardening release (from a full code audit).
