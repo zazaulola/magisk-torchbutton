@@ -1,14 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" xmlns:xlink="http://www.w3.org/1999/xlink" fill="white">
-    <!-- Launcher icon: white power-ring + bolt on a red circle. Gap is a
-         symmetric vertical slot so BOTH ends are flat & vertical. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" xmlns:xlink="http://www.w3.org/1999/xlink"  fill="white">
+
     <circle cx="32" cy="32" r="32" fill="red"/>
+    <path id="torch" d="M26,5 v 16 h 4 v 12 l 8,-16 h -4 l 4,-12 z " />
     <defs>
         <mask id="gap">
-            <rect x="0" y="0" width="64" height="64" fill="white"/>
-            <rect x="22" y="0" width="20" height="22" fill="black"/>
+            <rect x="0" y="0" width="64" height="64"/>
+            <use xlink:href="#torch" stroke-width="12" fill="black" stroke="black" />
         </mask>
     </defs>
-    <path mask="url(#gap)" fill-rule="evenodd"
-        d="M32,9 A24,24 0 1,1 32,57 A24,24 0 1,1 32,9 Z M32,16 A17,17 0 1,1 32,50 A17,17 0 1,1 32,16 Z"/>
-    <path d="M26,5 v 16 h 4 v 12 l 8,-16 h -4 l 4,-12 z"/>
+    <path mask="url(#gap)"
+        d="M 38 10 a 24 24 0 1 1 -12 0 v 7 a 17 17 0 1 0 12 0 z"/>
 </svg>

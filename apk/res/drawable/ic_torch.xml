@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Monochrome QS-tile variant (SystemUI tints it). Flattened from art/qs.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="64"
-    android:viewportHeight="64">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M 22 11.181641 A 24 24 0 0 0 32 57 A 24 24 0 0 0 42 11.181641 L 42 19.251953 A 17 17 0 0 1 32 50 A 17 17 0 0 1 22 19.251953 L 22 11.181641 z " />
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M 20 12.453125 A 24 24 0 1 0 46.246094 13.923828 L 43.166016 20.085938 A 17 17 0 1 1 20 20.865234 L 20 12.453125 z " />
     <path android:fillColor="#FFFFFFFF" android:pathData="M26,5 v16 h4 v12 l8,-16 h-4 l4,-12 z" />
 </vector>

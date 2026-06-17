@@ -1,10 +1,16 @@
 # Changelog
 
+## v1.1.6
+
+- Icon: corrected the ring-gap rendering. The gap follows the lightning bolt so
+  the right end runs parallel to the bolt's lower-right diagonal (the intended
+  look). v1.1.5 had mistakenly squared both ends; v1.1.4's flatten had rounded
+  the join. The vector drawables are now flattened from the SVG with sharp
+  miter joins, matching it exactly. No functional changes.
+
 ## v1.1.5
 
-- Icon: the power-ring gap now has two flat, vertical, symmetric ends (the gap
-  is a vertical slot, not the lightning-bolt outline — which previously slanted
-  the right end). Slightly thinner ring. No functional changes.
+- Icon: square ring-gap ends (later corrected in v1.1.6).
 
 ## v1.1.4
 
