@@ -1,18 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Power symbol with a lightning bolt in the gap = "power button -> flash".
-     Flattened from art/app.svg (mask boolean-diffed into a ring-with-hole). -->
+<!-- Power symbol (bolt in a flat-ended gap) on a red circle. Flattened from
+     art/app.svg: annulus r24/r17 minus a vertical slot, plus the bolt. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
-    <path
-        android:fillColor="#FF0000"
+    <path android:fillColor="#FF0000"
         android:pathData="M32,0 A32,32 0 1,0 32,64 A32,32 0 1,0 32,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 41.818359 11.056641 L 41.804688 11.091797 A 6.0006 6.0006 0 0 1 43.429688 17.554688 L 41.796875 21.025391 A 16 16 0 1 1 20.179688 21.044922 A 6.0006 6.0006 0 0 1 20 20 L 20 12.171875 A 24 24 0 1 0 41.818359 11.056641 z " />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M26,4 v16 h4 v12 l8,-17 h-4 l4,-11 z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M 22 11.181641 A 24 24 0 0 0 32 57 A 24 24 0 0 0 42 11.181641 L 42 19.251953 A 17 17 0 0 1 32 50 A 17 17 0 0 1 22 19.251953 L 22 11.181641 z " />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M26,5 v16 h4 v12 l8,-16 h-4 l4,-12 z" />
 </vector>

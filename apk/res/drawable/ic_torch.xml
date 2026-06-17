@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome variant for the Quick Settings tile (SystemUI applies tint).
-     Flattened from art/qs.svg. -->
+<!-- Monochrome QS-tile variant (SystemUI tints it). Flattened from art/qs.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="64"
     android:viewportHeight="64">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 42.748047 11.498047 L 41.804688 14.091797 A 6.0006 6.0006 0 0 1 43.429688 20.554688 L 42.757812 21.982422 A 16 16 0 1 1 20 21.212891 L 20 12.171875 A 24 24 0 1 0 42.748047 11.498047 z " />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M26,7 v16 h4 v12 l8,-17 h-4 l4,-11 z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M 22 11.181641 A 24 24 0 0 0 32 57 A 24 24 0 0 0 42 11.181641 L 42 19.251953 A 17 17 0 0 1 32 50 A 17 17 0 0 1 22 19.251953 L 22 11.181641 z " />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M26,5 v16 h4 v12 l8,-16 h-4 l4,-12 z" />
 </vector>

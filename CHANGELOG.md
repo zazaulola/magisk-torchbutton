@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.5
+
+- Icon: the power-ring gap now has two flat, vertical, symmetric ends (the gap
+  is a vertical slot, not the lightning-bolt outline — which previously slanted
+  the right end). Slightly thinner ring. No functional changes.
+
 ## v1.1.4
 
 - Icon refresh: thicker ring on the power+bolt glyph (launcher icon and QS
